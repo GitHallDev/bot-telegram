@@ -369,9 +369,8 @@ bot.action(/^e:(\d+)$/, async (ctx) => {
   const hasLinks = s.episodes.providers.some(p => p.links[n - 1]);
   if (!hasLinks) return ctx.reply(`❌ Aucun lecteur disponible pour l'épisode ${n}.`);
 
-  // URL de la Mini App avec des paramètres (ex: quelle saison, quel épisode, quelle langue)
-  // Remarque : En production, SERVER_URL devra être ton domaine en HTTPS (ex: https://ton-domaine.com)
-  const webAppUrl = `${SERVER_URL}/index.html?season=${encodeURIComponent(s.season.name)}&ep=${n}&lang=${s.lang}`;
+  // URL de la Mini App avec les paramètres nécessaires pour retrouver les vrais liens de cet épisode
+  const webAppUrl = `${SERVER_URL}/index.html?animeUrl=${encodeURIComponent(s.anime.url)}&seasonUrl=${encodeURIComponent(s.season.url)}&season=${encodeURIComponent(s.season.name)}&ep=${n}&lang=${s.lang}&animeTitle=${encodeURIComponent(s.anime.title)}`;
 
   await ctx.reply(
     `🎬 <b>${esc(s.anime.title)}</b>\n${esc(s.season.name)} · Épisode ${n} · ${s.lang.toUpperCase()}\n\nClique ci-dessous pour regarder ou télécharger l'épisode :`,
@@ -414,35 +413,42 @@ bot.action('d', async (ctx) => {
 
 // API endpoint pour que la Mini App récupère les liens en temps réel
 app.get('/api/episodes', async (req, res) => {
-  const { seasonName, ep, lang } = req.query;
+  const { animeUrl, seasonUrl, seasonName, ep, lang, animeTitle } = req.query;
   const episodeNum = Number(ep);
 
-  // On recherche la session active ou on relance un petit scraping rapide
-  // Pour faire simple et fiable, on peut parcourir les sessions ou stocker l'anime sélectionné.
-  // Astuce : On peut retrouver l'anime et la saison si on stocke les données proprement, 
-  // ou passer l'URL de l'anime directement dans les paramètres de la Mini App.
-  
-  // Exemple simplifié : Imaginons que l'on passe l'URL de la saison ou l'ID de l'anime dans l'URL de la Mini App.
-  // Pour l'instant, simulons le retour des liens avec les providers de ton code existant :
-  
+  if (!animeUrl || !seasonUrl) {
+    return res.status(400).json({
+      success: false,
+      error: 'Paramètres manquants: animeUrl et seasonUrl requis.'
+    });
+  }
+
   try {
-    // Si tu as gardé l'objet session ou si tu passes les paramètres :
-    // Ici, tu peux réutiliser ta fonction getEpisodes(animeUrl, season, lang)
-    
-    // Exemple de réponse JSON renvoyée à la Mini App :
-    res.json({
+    const season = { name: String(seasonName || 'Saison'), url: String(seasonUrl) };
+    const data = await getEpisodes(String(animeUrl), season, String(lang || 'vostfr'));
+
+    const links = (data.providers || [])
+      .map((provider) => {
+        const url = provider.links?.[episodeNum - 1];
+        if (!url) return null;
+        return {
+          host: `Lecteur ${provider.id || 'N/A'}`,
+          url,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json({
       success: true,
-      animeTitle: "Titre de l'anime",
-      seasonName: seasonName,
+      animeTitle: animeTitle || 'Anime',
+      seasonName: season.name,
       episode: episodeNum,
-      lang: lang,
-      links: [
-        { host: "Lecteur 1", url: "https://exemple.com/video1" },
-        { host: "Lecteur 2", url: "https://exemple.com/video2" }
-      ]
+      lang: String(lang || 'vostfr'),
+      links,
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: "Erreur lors de la récupération des liens." });
+    console.error('Erreur /api/episodes:', error.message);
+    return res.status(500).json({ success: false, error: 'Erreur lors de la récupération des liens.' });
   }
 });
 

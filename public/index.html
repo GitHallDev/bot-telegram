@@ -42,19 +42,31 @@
 
     // Récupérer les paramètres de l'URL
     const urlParams = new URLSearchParams(window.location.search);
+    const animeUrl = urlParams.get('animeUrl') || '';
+    const seasonUrl = urlParams.get('seasonUrl') || '';
     const seasonName = urlParams.get('season') || 'Saison';
     const epNum = urlParams.get('ep') || '1';
     const lang = (urlParams.get('lang') || 'vostfr').toUpperCase();
+    const animeTitle = urlParams.get('animeTitle') || 'Anime';
 
-    document.getElementById('anime-title').textContent = seasonName;
-    document.getElementById('episode-subtitle').textContent = `Épisode ${epNum} · ${lang}`;
+    document.getElementById('anime-title').textContent = animeTitle || seasonName;
+    document.getElementById('episode-subtitle').textContent = `${seasonName} · Épisode ${epNum} · ${lang}`;
 
     const container = document.getElementById('links-container');
 
     // Fonction pour interroger ton serveur Express
     async function fetchEpisodeLinks() {
         try {
-            const response = await fetch(`/api/episodes?seasonName=${encodeURIComponent(seasonName)}&ep=${epNum}&lang=${lang}`);
+            const query = new URLSearchParams({
+                animeUrl,
+                seasonUrl,
+                seasonName,
+                ep: epNum,
+                lang: lang.toLowerCase(),
+                animeTitle,
+            });
+
+            const response = await fetch(`/api/episodes?${query.toString()}`);
             const data = await response.json();
 
             if (!data.success || !data.links.length) {

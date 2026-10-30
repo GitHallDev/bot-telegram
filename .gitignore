@@ -1,0 +1,40 @@
+# Dépendances
+node_modules/
+
+# Fichiers d'environnement
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+*.log
+
+# Cache / artefacts
+.cache/
+*.tmp
+*.temp
+
+downloads/
+!downloads/.gitkeep
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# IDE / éditeur
+.vscode/
+.idea/
+
+# Fichiers de build / runtime
+coverage/
+.dist/
+dist/
+build/
+
+# Fichiers de session / temporaires
+*.pid
+*.seed
+*.pid.lock

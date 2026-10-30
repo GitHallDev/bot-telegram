@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecteur Anime - Mini App</title>
+    <!-- Tailwind CSS pour un design propre et rapide -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SDK Telegram Web App -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- En-tête -->
+    <header class="bg-slate-800 p-4 shadow-md text-center">
+        <h1 id="anime-title" class="text-lg font-bold text-indigo-400">Chargement...</h1>
+        <p id="episode-subtitle" class="text-sm text-slate-400">Veuillez patienter</p>
+    </header>
+
+    <!-- Contenu principal -->
+    <main class="flex-1 p-4 max-w-md mx-auto w-full flex flex-col justify-center">
+        <div class="bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-700">
+            <h2 class="text-md font-semibold mb-4 text-center">🔗 Lecteurs disponibles</h2>
+            
+            <!-- Liste des liens injectés dynamiquement -->
+            <div id="links-container" class="space-y-3">
+                <div class="text-center text-slate-400 py-4 animate-pulse">
+                    Récupération des liens de l'épisode...
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 text-center text-xs text-slate-500">
+            Utilisez les lecteurs ci-dessus pour regarder ou télécharger l'épisode hors-ligne via votre navigateur.
+        </div>
+    </main>
+
+    <!-- Script de logique -->
+    <script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    // Récupérer les paramètres de l'URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const seasonName = urlParams.get('season') || 'Saison';
+    const epNum = urlParams.get('ep') || '1';
+    const lang = (urlParams.get('lang') || 'vostfr').toUpperCase();
+
+    document.getElementById('anime-title').textContent = seasonName;
+    document.getElementById('episode-subtitle').textContent = `Épisode ${epNum} · ${lang}`;
+
+    const container = document.getElementById('links-container');
+
+    // Fonction pour interroger ton serveur Express
+    async function fetchEpisodeLinks() {
+        try {
+            const response = await fetch(`/api/episodes?seasonName=${encodeURIComponent(seasonName)}&ep=${epNum}&lang=${lang}`);
+            const data = await response.json();
+
+            if (!data.success || !data.links.length) {
+                container.innerHTML = `<p class="text-center text-red-400">Aucun lien trouvé pour cet épisode.</p>`;
+                return;
+            }
+
+            // Générer dynamiquement les boutons pour chaque lecteur
+            container.innerHTML = data.links.map(link => `
+                <a href="${link.url}" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg text-center transition shadow mb-2">
+                    ▶️ Regarder / Télécharger (${link.host})
+                </a>
+            `).join('');
+
+        } catch (error) {
+            console.error(error);
+            container.innerHTML = `<p class="text-center text-red-400">Erreur de connexion au serveur.</p>`;
+        }
+    }
+
+    // Lancer la récupération au chargement de la page
+    fetchEpisodeLinks();
+</script>
+</body>
+</html>

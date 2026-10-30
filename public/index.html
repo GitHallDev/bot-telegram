@@ -1,94 +1,238 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lecteur Anime - Mini App</title>
-    <!-- Tailwind CSS pour un design propre et rapide -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- SDK Telegram Web App -->
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lecteur Anime</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="./style.css" />
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+<body>
+    <div class="bg-backdrop"></div>
 
-    <!-- En-tête -->
-    <header class="bg-slate-800 p-4 shadow-md text-center">
-        <h1 id="anime-title" class="text-lg font-bold text-indigo-400">Chargement...</h1>
-        <p id="episode-subtitle" class="text-sm text-slate-400">Veuillez patienter</p>
-    </header>
+    <div class="player-shell">
+        <div class="window-topbar">
+            <span class="traffic traffic-red"></span>
+            <span class="traffic traffic-yellow"></span>
+            <span class="traffic traffic-green"></span>
+        </div>
 
-    <!-- Contenu principal -->
-    <main class="flex-1 p-4 max-w-md mx-auto w-full flex flex-col justify-center">
-        <div class="bg-slate-800 rounded-xl p-5 shadow-lg border border-slate-700">
-            <h2 class="text-md font-semibold mb-4 text-center">🔗 Lecteurs disponibles</h2>
-            
-            <!-- Liste des liens injectés dynamiquement -->
-            <div id="links-container" class="space-y-3">
-                <div class="text-center text-slate-400 py-4 animate-pulse">
-                    Récupération des liens de l'épisode...
+        <div class="player-window">
+            <div class="video-title" id="videoTitle">Chargement...</div>
+
+            <video id="videoPlayer" playsinline preload="metadata" controls="false"></video>
+
+            <div class="controls-panel">
+                <div class="time-row">
+                    <span id="currentTime">0:04</span>
+                    <input id="progressBar" type="range" min="0" max="100" value="0" />
+                    <span id="durationTime">0:07</span>
+                </div>
+
+                <div class="bottom-row">
+                    <div class="left-controls">
+                        <button class="icon-btn" id="volumeBtn" aria-label="Volume">🔊</button>
+                        <div class="volume-wrap">
+                            <input id="volumeBar" type="range" min="0" max="100" value="80" />
+                        </div>
+                    </div>
+
+                    <div class="center-controls">
+                        <button class="nav-btn" id="prevBtn" aria-label="Précédent">⏮</button>
+                        <button class="nav-btn play-btn" id="playBtn" aria-label="Lire / Pause">⏸</button>
+                        <button class="nav-btn" id="nextBtn" aria-label="Suivant">⏭</button>
+                    </div>
+
+                    <div class="right-controls">
+                        <button class="icon-btn" id="sourceBtn" aria-label="Source">⏺</button>
+                        <button class="icon-btn" id="settingsBtn" aria-label="Réglages">⚙</button>
+                        <button class="icon-btn" id="menuBtn" aria-label="Menu">☰</button>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="mt-6 text-center text-xs text-slate-500">
-            Utilisez les lecteurs ci-dessus pour regarder ou télécharger l'épisode hors-ligne via votre navigateur.
+        <div class="source-panel">
+            <label for="sourceSelect">Source :</label>
+            <select id="sourceSelect">
+                <option>Chargement...</option>
+            </select>
         </div>
-    </main>
+    </div>
 
-    <!-- Script de logique -->
     <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+        const tg = window.Telegram && window.Telegram.WebApp;
+        if (tg) tg.expand();
 
-    // Récupérer les paramètres de l'URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const animeUrl = urlParams.get('animeUrl') || '';
-    const seasonUrl = urlParams.get('seasonUrl') || '';
-    const seasonName = urlParams.get('season') || 'Saison';
-    const epNum = urlParams.get('ep') || '1';
-    const lang = (urlParams.get('lang') || 'vostfr').toUpperCase();
-    const animeTitle = urlParams.get('animeTitle') || 'Anime';
+        const urlParams = new URLSearchParams(window.location.search);
+        const animeUrl = urlParams.get('animeUrl') || '';
+        const seasonUrl = urlParams.get('seasonUrl') || '';
+        const seasonName = urlParams.get('season') || 'Saison';
+        const epNum = urlParams.get('ep') || '1';
+        const lang = (urlParams.get('lang') || 'vostfr').toUpperCase();
+        const animeTitle = urlParams.get('animeTitle') || 'Anime';
 
-    document.getElementById('anime-title').textContent = animeTitle || seasonName;
-    document.getElementById('episode-subtitle').textContent = `${seasonName} · Épisode ${epNum} · ${lang}`;
+        const videoTitle = document.getElementById('videoTitle');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const sourceSelect = document.getElementById('sourceSelect');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeEl = document.getElementById('currentTime');
+        const durationTimeEl = document.getElementById('durationTime');
+        const playBtn = document.getElementById('playBtn');
+        const volumeBar = document.getElementById('volumeBar');
 
-    const container = document.getElementById('links-container');
+        const state = {
+            links: [],
+            active: 0,
+        };
 
-    // Fonction pour interroger ton serveur Express
-    async function fetchEpisodeLinks() {
-        try {
-            const query = new URLSearchParams({
-                animeUrl,
-                seasonUrl,
-                seasonName,
-                ep: epNum,
-                lang: lang.toLowerCase(),
-                animeTitle,
-            });
+        function formatTime(seconds) {
+            if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
 
-            const response = await fetch(`/api/episodes?${query.toString()}`);
-            const data = await response.json();
+        function setVideoTitle() {
+            const selected = state.links[state.active];
+            const label = selected ? selected.host : 'Source';
+            videoTitle.textContent = `${animeTitle || seasonName} · ${label}`;
+        }
 
-            if (!data.success || !data.links.length) {
-                container.innerHTML = `<p class="text-center text-red-400">Aucun lien trouvé pour cet épisode.</p>`;
+        function renderSources() {
+            if (!state.links.length) {
+                sourceSelect.innerHTML = '<option>Aucune source disponible</option>';
                 return;
             }
 
-            // Générer dynamiquement les boutons pour chaque lecteur
-            container.innerHTML = data.links.map(link => `
-                <a href="${link.url}" target="_blank" class="block w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 px-4 rounded-lg text-center transition shadow mb-2">
-                    ▶️ Regarder / Télécharger (${link.host})
-                </a>
-            `).join('');
+            sourceSelect.innerHTML = state.links
+                .map((link, index) => `<option value="${index}">${link.host}</option>`)
+                .join('');
 
-        } catch (error) {
-            console.error(error);
-            container.innerHTML = `<p class="text-center text-red-400">Erreur de connexion au serveur.</p>`;
+            sourceSelect.value = String(state.active);
+            setVideoTitle();
         }
-    }
 
-    // Lancer la récupération au chargement de la page
-    fetchEpisodeLinks();
-</script>
+        function loadSelectedSource(index) {
+            const link = state.links[index];
+            if (!link) return;
+
+            state.active = index;
+            sourceSelect.value = String(index);
+            setVideoTitle();
+
+            const safeUrl = link.url.trim();
+            videoPlayer.src = safeUrl;
+            videoPlayer.load();
+            videoPlayer.play().catch(() => {});
+        }
+
+        async function fetchEpisodeLinks() {
+            try {
+                const query = new URLSearchParams({
+                    animeUrl,
+                    seasonUrl,
+                    seasonName,
+                    ep: epNum,
+                    lang: lang.toLowerCase(),
+                    animeTitle,
+                });
+
+                const response = await fetch(`/api/episodes?${query.toString()}`);
+                const data = await response.json();
+
+                if (!data.success || !data.links || !data.links.length) {
+                    videoTitle.textContent = 'Aucune source disponible';
+                    sourceSelect.innerHTML = '<option>Aucune source</option>';
+                    return;
+                }
+
+                state.links = data.links;
+                renderSources();
+                loadSelectedSource(0);
+            } catch (error) {
+                console.error(error);
+                videoTitle.textContent = 'Erreur de chargement';
+                sourceSelect.innerHTML = '<option>Erreur</option>';
+            }
+        }
+
+        sourceSelect.addEventListener('change', (event) => {
+            const index = Number(event.target.value);
+            if (!Number.isNaN(index)) loadSelectedSource(index);
+        });
+
+        playBtn.addEventListener('click', () => {
+            if (videoPlayer.paused) {
+                videoPlayer.play().catch(() => {});
+            } else {
+                videoPlayer.pause();
+            }
+        });
+
+        videoPlayer.addEventListener('play', () => {
+            playBtn.textContent = '⏸';
+        });
+
+        videoPlayer.addEventListener('pause', () => {
+            playBtn.textContent = '▶';
+        });
+
+        videoPlayer.addEventListener('loadedmetadata', () => {
+            const total = videoPlayer.duration || 0;
+            durationTimeEl.textContent = formatTime(total);
+            progressBar.max = total || 100;
+        });
+
+        videoPlayer.addEventListener('timeupdate', () => {
+            const current = videoPlayer.currentTime || 0;
+            const total = videoPlayer.duration || 0;
+            currentTimeEl.textContent = formatTime(current);
+            durationTimeEl.textContent = formatTime(total);
+            if (total > 0) {
+                progressBar.value = current;
+                progressBar.max = total;
+            }
+        });
+
+        progressBar.addEventListener('input', () => {
+            if (videoPlayer.duration) {
+                videoPlayer.currentTime = Number(progressBar.value);
+            }
+        });
+
+        volumeBar.addEventListener('input', () => {
+            const value = Number(volumeBar.value) / 100;
+            videoPlayer.volume = value;
+            videoPlayer.muted = value === 0;
+        });
+
+        videoPlayer.volume = 0.8;
+        videoPlayer.muted = false;
+        document.getElementById('sourceBtn').addEventListener('click', () => {
+            sourceSelect.focus();
+        });
+
+        document.getElementById('settingsBtn').addEventListener('click', () => {
+            alert('Réglages de lecture à venir');
+        });
+
+        document.getElementById('menuBtn').addEventListener('click', () => {
+            alert('Menu à venir');
+        });
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            const nextIndex = state.active > 0 ? state.active - 1 : 0;
+            loadSelectedSource(nextIndex);
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            if (!state.links.length) return;
+            const nextIndex = state.active < state.links.length - 1 ? state.active + 1 : 0;
+            loadSelectedSource(nextIndex);
+        });
+
+        fetchEpisodeLinks();
+    </script>
 </body>
 </html>

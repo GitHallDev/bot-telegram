@@ -121,7 +121,47 @@
             fsExit: document.getElementById('fsExit'),
         };
 
-        const state = { links: [], active: 0 };
+        const state = { links: [], active: 0, formats: [] };
+
+        function getSelectedFormat() {
+            const selectedId = el.quality.value;
+            return state.formats.find((format) => String(format.id) === String(selectedId)) || null;
+        }
+
+        function populateQualityOptions(formats) {
+            state.formats = Array.isArray(formats) ? formats : [];
+            if (!state.formats.length) {
+                el.quality.innerHTML = '<option value="best">Qualité max (Auto)</option>';
+                el.quality.value = 'best';
+                return;
+            }
+
+            el.quality.innerHTML = state.formats
+                .map((format) => `<option value="${format.id}">${format.label || `${format.height || 'Best'}p`}</option>`)
+                .join('');
+            el.quality.value = String(state.formats[0].id);
+        }
+
+        async function loadFormatsForCurrentSource() {
+            const link = state.links[state.active];
+            if (!link) return;
+
+            el.quality.innerHTML = '<option value="">Chargement des formats…</option>';
+            try {
+                const response = await fetch(`/api/formats?url=${encodeURIComponent(link.url.trim())}`);
+                const data = await response.json();
+                const formats = Array.isArray(data.formats) && data.formats.length ? data.formats : [];
+                populateQualityOptions(formats);
+                if (formats.length) {
+                    updateVideoSize();
+                } else {
+                    el.sizeText.textContent = '📊 Taille estimée : non disponible';
+                }
+            } catch (e) {
+                el.quality.innerHTML = '<option value="best">Qualité max (Auto)</option>';
+                el.sizeText.textContent = '📊 Taille estimée : erreur de calcul';
+            }
+        }
 
         async function updateVideoSize() {
             if (!el.sizeText) return;
@@ -131,14 +171,14 @@
                 return;
             }
 
-            const quality = el.quality.value;
-            const format = el.format.value;
+            const selectedFormat = getSelectedFormat();
+            const formatId = selectedFormat ? selectedFormat.id : 'best';
             el.sizeText.textContent = '📊 Taille estimée : calcul…';
 
             try {
-                const response = await fetch(`/api/video-size?url=${encodeURIComponent(link.url.trim())}&quality=${quality}&format=${format}`);
+                const response = await fetch(`/api/video-size?url=${encodeURIComponent(link.url.trim())}&formatId=${encodeURIComponent(formatId)}`);
                 const data = await response.json();
-                if (data.success) {
+                if (data.success && data.size) {
                     el.sizeText.textContent = `📊 Taille estimée : ${data.size}`;
                 } else {
                     el.sizeText.textContent = '📊 Taille estimée : non disponible';
@@ -195,6 +235,7 @@
             el.copy.classList.remove('is-copied');
             showState('Chargement du lecteur…');
             el.player.src = url;
+            loadFormatsForCurrentSource();
         }
 
         async function copyText(text) {
@@ -234,23 +275,23 @@
             const link = state.links[state.active];
             if (!link) return;
 
-            const quality = el.quality.value || 'best';
-            const format = el.format.value || 'mp4';
-            const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.${format}`;
+            const selectedFormat = getSelectedFormat();
+            const formatId = selectedFormat ? selectedFormat.id : null;
+            const ext = selectedFormat ? (selectedFormat.ext || el.format.value || 'mp4') : (el.format.value || 'mp4');
+            const quality = selectedFormat ? selectedFormat.height || 'best' : (el.quality.value || 'best');
+            const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.${ext}`;
             el.download.disabled = true;
 
-            // Affichage d'un indicateur visuel initial
-            showState(`⏳ Préparation du téléchargement (${quality}p / ${format.toUpperCase()})…`);
+            showState(`⏳ Préparation du téléchargement (${quality}${quality !== 'best' ? 'p' : ''} / ${ext.toUpperCase()})…`);
 
             try {
-
-                            el.download.title = 'Téléchargement...';
-            showState('Téléchargement en cours…');
+                el.download.title = 'Téléchargement...';
+                showState('Téléchargement en cours…');
 
                 const response = await fetch('/api/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: link.url.trim(), filename, quality, format })
+                    body: JSON.stringify({ url: link.url.trim(), filename, quality, format: ext, formatId })
                 });
                 const data = await response.json();
 
@@ -258,7 +299,6 @@
                     throw new Error(data.error || 'Téléchargement refusé.');
                 }
 
-                // Déclenchement du téléchargement final pour l'utilisateur
                 showState('✅ Fichier prêt ! Lancement du téléchargement sur votre appareil...');
 
                 const a = document.createElement('a');

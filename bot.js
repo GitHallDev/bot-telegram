@@ -1,9 +1,10 @@
 require('dotenv').config();
 
+const { exec } = require('child_process');
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const path = require('path');
-const { downloadVideo } = require('./app.js');
+const { downloadVideo, parseYtDlpFormats, formatBytes } = require('./app.js');
 
 // ───────────── Config ─────────────
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
@@ -454,8 +455,30 @@ app.get('/api/episodes', async (req, res) => {
 });
 
 
+app.get('/api/formats', (req, res) => {
+  const { url } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'URL manquante.' });
+
+  const ytDlpPath = path.join(__dirname, 'yt-dlp');
+  const safeUrl = String(url).replace(/"/g, '\\"');
+  const command = `"${ytDlpPath}" --no-warnings --print "%(format_id)s|%(ext)s|%(height)s|%(format_note)s|%(filesize)s|%(filesize_approx)s" "${safeUrl}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      console.error('Erreur /api/formats:', stderr || error.message);
+      return res.json({ success: true, formats: [] });
+    }
+
+    const formats = parseYtDlpFormats(stdout)
+      .filter((format) => format.height || format.note)
+      .slice(0, 24);
+
+    return res.json({ success: true, formats });
+  });
+});
+
 app.post('/api/download', async (req, res) => {
-  const { url, filename, quality, format } = req.body || {};
+  const { url, filename, quality, format, formatId } = req.body || {};
 
   if (!url) {
     return res.status(400).json({ success: false, error: 'URL manquante.' });
@@ -468,7 +491,7 @@ app.post('/api/download', async (req, res) => {
   const outputPath = path.join(__dirname, 'downloads', safeFilename || 'anime-download.mp4');
 
   try {
-    await downloadVideo(String(url), outputPath, String(quality || 'best'), String(format || 'mp4'));
+    await downloadVideo(String(url), outputPath, String(quality || 'best'), String(format || 'mp4'), formatId ? String(formatId) : null);
     return res.json({
       success: true,
       filename: safeFilename,
@@ -480,44 +503,30 @@ app.post('/api/download', async (req, res) => {
   }
 });
 
-// Route pour estimer la taille de la vidéo en fonction de la qualité et du format
-app.get('/api/video-size', async (req, res) => {
-  const { url, quality, format } = req.query;
+app.get('/api/video-size', (req, res) => {
+  const { url, quality, format, formatId } = req.query;
   if (!url) return res.status(400).json({ success: false, error: 'URL manquante' });
 
-    // On pointe explicitement vers le binaire yt-dlp téléchargé à la racine du projet
-    const ytDlpPath = path.join(__dirname, 'yt-dlp');
-  
-  // Construction du format selon les critères choisis
-  let formatArg = '';
-  if (quality === '360') {
-    formatArg = `-f "bestvideo[height<=360][ext=${format}]+bestaudio/best[height<=360] / best[height<=360]"`;
-  } else if (quality === '720') {
-    formatArg = `-f "bestvideo[height<=720][ext=${format}]+bestaudio/best[height<=720] / best[height<=720]"`;
-  } else if (quality === '1080') {
-    formatArg = `-f "bestvideo[height<=1080][ext=${format}]+bestaudio/best[height<=1080] / best[height<=1080]"`;
-  } else {
-    formatArg = `-f "bv*[ext=${format}]+ba/b[ext=${format}] / b"`;
-  }
+  const ytDlpPath = path.join(__dirname, 'yt-dlp');
+  const safeUrl = String(url).replace(/"/g, '\\"');
 
-  // Commande yt-dlp pour simuler et afficher la taille du fichier (--print filesize)
-  const command = `"${ytDlpPath}" ${formatArg} --print filesize "${url}"`;
+  const command = formatId
+    ? `"${ytDlpPath}" --no-warnings --print "%(filesize)s|%(filesize_approx)s" --format "${String(formatId)}" "${safeUrl}"`
+    : `"${ytDlpPath}" --no-warnings --print "%(filesize)s|%(filesize_approx)s" -f "bestvideo[height<=${quality || '1080'}][ext=${format || 'mp4'}]+bestaudio/best[height<=${quality || '1080'}] / best[height<=${quality || '1080'}]" "${safeUrl}"`;
 
   exec(command, (error, stdout, stderr) => {
     if (error) {
-      return res.json({ success: true, size: 'Inconnue' });
+      console.error('Erreur /api/video-size:', stderr || error.message);
+      return res.json({ success: false, size: 'Inconnue' });
     }
 
-    const bytes = parseInt(stdout.trim(), 10);
-    if (isNaN(bytes) || bytes <= 0) {
+    const [rawFilesize, rawApprox] = String(stdout || '').split('|');
+    const bytes = Number(rawFilesize) || Number(rawApprox) || 0;
+    if (!bytes) {
       return res.json({ success: true, size: 'Estimation indisponible' });
     }
 
-    // Convertir les octets en Mo ou Go de manière propre
-    const sizeMb = (bytes / (1024 * 1024)).toFixed(1);
-    const formattedSize = sizeMb > 1024 ? (sizeMb / 1024).toFixed(2) + ' Go' : sizeMb + ' Mo';
-
-    res.json({ success: true, size: formattedSize });
+    res.json({ success: true, size: formatBytes(bytes) });
   });
 });
 

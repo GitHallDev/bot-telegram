@@ -1,8 +1,9 @@
 require('dotenv').config();
 
 const { Telegraf, Markup } = require('telegraf');
-const express = require('express'); // 👈 Ajout d'Express
-const path = require('path');       // 👈 Pour gérer les chemins de fichiers
+const express = require('express');
+const path = require('path');
+const { downloadVideo } = require('./public/app.js');
 
 // ───────────── Config ─────────────
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
@@ -27,8 +28,8 @@ const bot = new Telegraf(BOT_TOKEN);
 const app = express(); // 👈 Initialisation d'Express
 
 // ───────────── Configuration Express (Mini App) ─────────────
-// Permet de servir tous les fichiers statiques du dossier "public"
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/downloads', express.static(path.join(__dirname, 'downloads')));
 app.use(express.json());
 
 // Lancer le serveur Express
@@ -449,6 +450,32 @@ app.get('/api/episodes', async (req, res) => {
   } catch (error) {
     console.error('Erreur /api/episodes:', error.message);
     return res.status(500).json({ success: false, error: 'Erreur lors de la récupération des liens.' });
+  }
+});
+
+app.post('/api/download', async (req, res) => {
+  const { url, filename } = req.body || {};
+
+  if (!url) {
+    return res.status(400).json({ success: false, error: 'URL manquante.' });
+  }
+
+  const safeFilename = String(filename || 'anime-download.mp4')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .trim();
+
+  const outputPath = path.join(__dirname, 'downloads', safeFilename || 'anime-download.mp4');
+
+  try {
+    await downloadVideo(String(url), outputPath);
+    return res.json({
+      success: true,
+      filename: safeFilename,
+      downloadUrl: `/downloads/${encodeURIComponent(safeFilename)}`,
+    });
+  } catch (error) {
+    console.error('Erreur /api/download:', error.message);
+    return res.status(500).json({ success: false, error: 'Impossible de télécharger la vidéo.' });
   }
 });
 

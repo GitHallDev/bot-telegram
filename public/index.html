@@ -28,6 +28,9 @@
                     <svg class="ico-copy" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
                     <svg class="ico-check" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
                 </button>
+                <button id="downloadBtn" class="icon-btn" type="button" title="Télécharger la source" aria-label="Télécharger la source">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 20l5 5 5-5"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+                </button>
                 <button id="fsBtn" class="icon-btn" type="button" title="Plein écran paysage" aria-label="Plein écran en mode paysage">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>
                 </button>
@@ -82,6 +85,7 @@
             actions: document.getElementById('sourceActions'),
             open: document.getElementById('openBtn'),
             copy: document.getElementById('copyBtn'),
+            download: document.getElementById('downloadBtn'),
             box: document.getElementById('playerBox'),
             fs: document.getElementById('fsBtn'),
             fsExit: document.getElementById('fsExit'),
@@ -160,6 +164,46 @@
                 el.copy.classList.remove('is-copied');
                 el.copy.title = 'Copier le lien';
             }, 1800);
+        });
+
+        el.download.addEventListener('click', async () => {
+            const link = state.links[state.active];
+            if (!link) return;
+
+            const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.mp4`;
+            el.download.disabled = true;
+            el.download.title = 'Téléchargement...';
+            showState('Téléchargement en cours…');
+
+            try {
+                const response = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: link.url.trim(), filename })
+                });
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Téléchargement refusé.');
+                }
+
+                const a = document.createElement('a');
+                a.href = data.downloadUrl || '/downloads/' + encodeURIComponent(filename);
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                showState('Téléchargement lancé.', false);
+                setTimeout(() => hideState(), 1800);
+            } catch (error) {
+                console.error(error);
+                showState('Impossible de démarrer le téléchargement.', true);
+            } finally {
+                el.download.disabled = false;
+                el.download.title = 'Télécharger la source';
+            }
         });
 
         // ---- Plein écran paysage ----

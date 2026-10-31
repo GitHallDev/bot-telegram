@@ -41,14 +41,7 @@
             <div class="download-options" id="downloadOptions" hidden>
                 <div class="download-row">
                     <select id="qualitySelect" class="select-sm" aria-label="Qualité">
-                        <option value="best">Max (Auto)</option>
-                        <option value="1080">1080p (HD)</option>
-                        <option value="720">720p (SD)</option>
-                        <option value="360">360p (Low)</option>
-                    </select>
-                    <select id="formatSelect" class="select-sm" aria-label="Format">
-                        <option value="mp4">MP4</option>
-                        <option value="mkv">MKV</option>
+                        <option value="">Chargement des formats…</option>
                     </select>
                     <button id="closeDownloadBtn" class="icon-btn-sm" type="button" title="Masquer les options" aria-label="Masquer les options">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -57,7 +50,6 @@
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
                     </button>
                 </div>
-                <div id="videoSizeText" class="download-size">📊 Taille estimée : calcul…</div>
             </div>
         </section>
 
@@ -112,10 +104,8 @@
             download: document.getElementById('downloadBtn'),
             downloadOptions: document.getElementById('downloadOptions'),
             closeDownload: document.getElementById('closeDownloadBtn'),
-            sizeText: document.getElementById('videoSizeText'),
             validateDownload: document.getElementById('validateDownloadBtn'),
             quality: document.getElementById('qualitySelect'),
-            format: document.getElementById('formatSelect'),
             box: document.getElementById('playerBox'),
             fs: document.getElementById('fsBtn'),
             fsExit: document.getElementById('fsExit'),
@@ -142,8 +132,7 @@
         function populateQualityOptions(formats) {
             state.formats = Array.isArray(formats) ? formats : [];
             if (!state.formats.length) {
-                el.quality.innerHTML = '<option value="best">Qualité max (Auto)</option>';
-                el.quality.value = 'best';
+                el.quality.innerHTML = '<option value="">Aucun format disponible</option>';
                 return;
             }
 
@@ -163,39 +152,8 @@
                 const data = await response.json();
                 const formats = Array.isArray(data.formats) && data.formats.length ? data.formats : [];
                 populateQualityOptions(formats);
-                if (formats.length) {
-                    updateVideoSize();
-                } else {
-                    el.sizeText.textContent = '📊 Taille estimée : non disponible';
-                }
             } catch (e) {
-                el.quality.innerHTML = '<option value="best">Qualité max (Auto)</option>';
-                el.sizeText.textContent = '📊 Taille estimée : erreur de calcul';
-            }
-        }
-
-        async function updateVideoSize() {
-            if (!el.sizeText) return;
-            const link = state.links[state.active];
-            if (!link) {
-                el.sizeText.textContent = '📊 Taille estimée : non disponible';
-                return;
-            }
-
-            const selectedFormat = getSelectedFormat();
-            const formatId = selectedFormat ? selectedFormat.id : 'best';
-            el.sizeText.textContent = '📊 Taille estimée : calcul…';
-
-            try {
-                const response = await fetch(`/api/video-size?url=${encodeURIComponent(link.url.trim())}&formatId=${encodeURIComponent(formatId)}`);
-                const data = await response.json();
-                if (data.success && data.size) {
-                    el.sizeText.textContent = `📊 Taille estimée : ${data.size}`;
-                } else {
-                    el.sizeText.textContent = '📊 Taille estimée : non disponible';
-                }
-            } catch (e) {
-                el.sizeText.textContent = '📊 Taille estimée : erreur de calcul';
+                el.quality.innerHTML = '<option value="">Format indisponible</option>';
             }
         }
 
@@ -203,9 +161,6 @@
             el.downloadOptions.hidden = !isOpen;
             el.download.title = isOpen ? 'Valider le téléchargement' : 'Télécharger la source';
             el.download.setAttribute('aria-label', isOpen ? 'Valider le téléchargement' : 'Télécharger la source');
-            if (isOpen) {
-                updateVideoSize();
-            }
         }
 
         el.title.textContent = animeTitle;
@@ -288,8 +243,8 @@
 
             const selectedFormat = getSelectedFormat();
             const formatId = selectedFormat ? selectedFormat.id : null;
-            const ext = selectedFormat ? (selectedFormat.ext || el.format.value || 'mp4') : (el.format.value || 'mp4');
-            const quality = selectedFormat ? selectedFormat.height || 'best' : (el.quality.value || 'best');
+            const ext = selectedFormat ? (selectedFormat.ext || 'mp4') : 'mp4';
+            const quality = selectedFormat ? String(selectedFormat.height || 'best') : 'best';
             const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.${ext}`;
             el.download.disabled = true;
 
@@ -349,10 +304,6 @@
                 showState('Téléchargement terminé ou annulé.', false);
             }
         }
-
-        // Écouter les changements sur les sélecteurs de qualité ou format pour mettre à jour la taille en temps réel
-        el.quality.addEventListener('change', updateVideoSize);
-        el.format.addEventListener('change', updateVideoSize);
 
         // Bouton pour fermer/masquer les options
         el.closeDownload.addEventListener('click', () => setDownloadUi(false));

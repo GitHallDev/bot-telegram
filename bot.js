@@ -463,17 +463,18 @@ app.get('/api/formats', (req, res) => {
   const ytDlpPath = path.join(__dirname, 'yt-dlp');
   const safeUrl = String(url).replace(/"/g, '\\"');
   const command = `"${ytDlpPath}" --no-warnings --print "%(format_id)s|%(ext)s|%(height)s|%(format_note)s|%(filesize)s|%(filesize_approx)s" "${safeUrl}"`;
-
+  console.log('Commande yt-dlp formats :', command);
   exec(command, (error, stdout, stderr) => {
     if (error) {
       console.error('Erreur /api/formats:', stderr || error.message);
       return res.json({ success: true, formats: [] });
     }
+    console.log('yt-dlp formats output:', stdout);
 
     const formats = parseYtDlpFormats(stdout)
       .filter((format) => format.height || format.note)
       .slice(0, 24);
-
+    console.log('Formats parsés :', formats);
     return res.json({ success: true, formats });
   });
 });

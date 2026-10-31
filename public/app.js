@@ -14,7 +14,10 @@ function downloadVideo(embedUrl, outputPath) {
   return new Promise((resolve, reject) => {
     const safeOutput = outputPath.replace(/"/g, '\\"');
     const safeUrl = embedUrl.replace(/"/g, '\\"');
-    const command = `yt-dlp -o "${safeOutput}" "${safeUrl}"`;
+    
+    // On pointe explicitement vers le binaire yt-dlp téléchargé à la racine du projet
+    const ytDlpPath = path.join(__dirname, 'yt-dlp');
+    const command = `"${ytDlpPath}" -o "${safeOutput}" "${safeUrl}"`;
 
     exec(command, (error, stdout, stderr) => {
       if (error) {

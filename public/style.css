@@ -154,9 +154,63 @@ html, body {
     white-space: nowrap;
 }
 
+/* Plein écran paysage */
+.fs-exit {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    cursor: pointer;
+}
+
+.fs-exit[hidden] { display: none; }
+
+.player:fullscreen,
+.player:-webkit-full-screen {
+    width: 100%;
+    height: 100%;
+    aspect-ratio: auto;
+    border-radius: 0;
+}
+
+body.pseudo-fs { overflow: hidden; }
+
+body.pseudo-fs .player {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    aspect-ratio: auto;
+    border-radius: 0;
+}
+
+/* En portrait, on pivote le lecteur de 90° pour simuler le paysage */
+@media (orientation: portrait) {
+    body.pseudo-fs .player {
+        inset: auto;
+        top: 0;
+        left: 0;
+        width: 100vh;
+        width: 100dvh;
+        height: 100vw;
+        height: 100dvw;
+        transform-origin: top left;
+        transform: rotate(90deg) translateY(-100%);
+    }
+}
+
 /* Accessibilité */
 .select:focus-visible,
-.icon-btn:focus-visible {
+.icon-btn:focus-visible,
+.fs-exit:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }

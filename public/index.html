@@ -28,6 +28,9 @@
                     <svg class="ico-copy" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
                     <svg class="ico-check" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
                 </button>
+                <button id="fsBtn" class="icon-btn" type="button" title="Plein écran paysage" aria-label="Plein écran en mode paysage">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>
+                </button>
             </div>
         </section>
 
@@ -39,6 +42,9 @@
                 allowfullscreen
                 referrerpolicy="no-referrer-when-downgrade"
             ></iframe>
+            <button id="fsExit" class="fs-exit" type="button" aria-label="Quitter le plein écran" hidden>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
             <div class="player-state" id="playerState">
                 <span class="spinner" aria-hidden="true"></span>
                 <p>Chargement du lecteur…</p>
@@ -76,6 +82,9 @@
             actions: document.getElementById('sourceActions'),
             open: document.getElementById('openBtn'),
             copy: document.getElementById('copyBtn'),
+            box: document.getElementById('playerBox'),
+            fs: document.getElementById('fsBtn'),
+            fsExit: document.getElementById('fsExit'),
         };
 
         const state = { links: [], active: 0 };
@@ -152,6 +161,61 @@
                 el.copy.title = 'Copier le lien';
             }, 1800);
         });
+
+        // ---- Plein écran paysage ----
+        const fs = { active: false, pseudo: false, tgFs: false };
+        const tgHas = (v) => tg && tg.isVersionAtLeast && tg.isVersionAtLeast(v);
+
+        async function enterLandscape() {
+            fs.active = true;
+            // 1) Plein écran natif (Android, desktop) + verrouillage en paysage
+            const req = el.box.requestFullscreen || el.box.webkitRequestFullscreen;
+            if (req) {
+                try {
+                    await req.call(el.box);
+                    try { await screen.orientation.lock('landscape'); } catch (e) { /* non supporté (iOS) */ }
+                    return;
+                } catch (e) { /* on passe au plan B */ }
+            }
+            // 2) Plan B : plein écran Telegram + mode "pseudo" pivoté si on est en portrait
+            if (tgHas('8.0')) {
+                try { tg.requestFullscreen(); fs.tgFs = true; } catch (e) {}
+                try { tg.lockOrientation(); } catch (e) {}
+            }
+            fs.pseudo = true;
+            document.body.classList.add('pseudo-fs');
+            el.fsExit.hidden = false;
+        }
+
+        function exitLandscape() {
+            if (!fs.active) return;
+            fs.active = false;
+            if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); }
+            else if (document.webkitFullscreenElement && document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+            try { screen.orientation.unlock(); } catch (e) {}
+            if (fs.pseudo) {
+                document.body.classList.remove('pseudo-fs');
+                el.fsExit.hidden = true;
+                fs.pseudo = false;
+            }
+            if (fs.tgFs) {
+                try { tg.unlockOrientation(); } catch (e) {}
+                try { tg.exitFullscreen(); } catch (e) {}
+                fs.tgFs = false;
+            }
+        }
+
+        // Sortie via les contrôles natifs (Échap, geste retour…)
+        function onNativeFsChange() {
+            if (fs.active && !fs.pseudo && !document.fullscreenElement && !document.webkitFullscreenElement) {
+                exitLandscape();
+            }
+        }
+        document.addEventListener('fullscreenchange', onNativeFsChange);
+        document.addEventListener('webkitfullscreenchange', onNativeFsChange);
+
+        el.fs.addEventListener('click', () => (fs.active ? exitLandscape() : enterLandscape()));
+        el.fsExit.addEventListener('click', exitLandscape);
 
         el.select.addEventListener('change', (e) => loadSource(Number(e.target.value)));
 

@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const { exec } = require('child_process');
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
@@ -477,6 +478,84 @@ app.get('/api/formats', (req, res) => {
   });
 });
 
+app.get('/api/downloads', (req, res) => {
+  const downloadDir = path.join(__dirname, 'downloads');
+
+  if (!fs.existsSync(downloadDir)) {
+    return res.json({ success: true, files: [] });
+  }
+
+  const files = fs.readdirSync(downloadDir)
+    .filter((file) => fs.statSync(path.join(downloadDir, file)).isFile())
+    .sort((a, b) => fs.statSync(path.join(downloadDir, b)).mtimeMs - fs.statSync(path.join(downloadDir, a)).mtimeMs)
+    .map((file) => ({
+      name: file,
+      url: `/downloads/${encodeURIComponent(file)}`,
+      size: fs.statSync(path.join(downloadDir, file)).size,
+    }));
+
+  return res.json({ success: true, files });
+});
+
+app.get('/my-downloads', (req, res) => {
+  const downloadDir = path.join(__dirname, 'downloads');
+  const files = fs.existsSync(downloadDir)
+    ? fs.readdirSync(downloadDir)
+        .filter((file) => fs.statSync(path.join(downloadDir, file)).isFile())
+        .sort((a, b) => fs.statSync(path.join(downloadDir, b)).mtimeMs - fs.statSync(path.join(downloadDir, a)).mtimeMs)
+    : [];
+
+  const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mes téléchargements</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { font-family: Arial, sans-serif; background: #0f0f12; color: #f5f7fa; margin: 0; padding: 24px; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { margin-top: 0; }
+    ul { list-style: none; padding: 0; display: grid; gap: 12px; }
+    li { background: #181922; border: 1px solid #2a2d38; border-radius: 12px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+    a { color: #7cc2ff; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .meta { color: #b9c1d1; font-size: 0.9rem; }
+    .empty { color: #d0d6e0; background: #181922; border: 1px solid #2a2d38; border-radius: 12px; padding: 18px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Mes téléchargements</h1>
+    ${files.length ? `
+      <ul>
+        ${files.map((file) => {
+          const fullPath = path.join(downloadDir, file);
+          const size = fs.statSync(fullPath).size;
+          const human = size > 1048576 ? `${(size / 1048576).toFixed(1)} Mo` : `${(size / 1024).toFixed(1)} Ko`;
+          return `
+            <li>
+              <div>
+                <div>${file}</div>
+                <div class="meta">${human}</div>
+              </div>
+              <div>
+                <a href="/downloads/${encodeURIComponent(file)}" target="_blank" rel="noopener noreferrer">Ouvrir</a>
+                &nbsp;|&nbsp;
+                <a href="/downloads/${encodeURIComponent(file)}" download>Télécharger</a>
+              </div>
+            </li>
+          `;
+        }).join('')}
+      </ul>
+    ` : `<div class="empty">Aucun fichier téléchargé pour le moment.</div>`}
+  </div>
+</body>
+</html>`;
+
+  res.type('html').send(html);
+});
+
 app.post('/api/download', async (req, res) => {
   const { url, filename, quality, format, formatId } = req.body || {};
 
@@ -496,6 +575,7 @@ app.post('/api/download', async (req, res) => {
       success: true,
       filename: safeFilename,
       downloadUrl: `/downloads/${encodeURIComponent(safeFilename)}`,
+      downloadsPageUrl: '/my-downloads',
     });
   } catch (error) {
     console.error('Erreur /api/download:', error.message);

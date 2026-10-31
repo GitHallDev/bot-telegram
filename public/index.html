@@ -310,7 +310,22 @@
                 a.click();
                 a.remove();
 
-                setTimeout(() => hideState(), 1800);
+                const openList = document.createElement('a');
+                openList.href = data.downloadsPageUrl || '/my-downloads';
+                openList.textContent = 'Voir mes téléchargements';
+                openList.target = '_blank';
+                openList.rel = 'noopener noreferrer';
+                openList.style.display = 'block';
+                openList.style.marginTop = '8px';
+                openList.style.color = '#7cc2ff';
+                openList.style.textDecoration = 'none';
+                const stateWrap = el.state.querySelector('p');
+                if (stateWrap) {
+                    stateWrap.appendChild(document.createElement('br'));
+                    stateWrap.appendChild(openList);
+                }
+
+                setTimeout(() => hideState(), 3200);
             } catch (error) {
                 console.error(error);
                 showState('Impossible de démarrer le téléchargement.', true);

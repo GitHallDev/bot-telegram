@@ -35,6 +35,21 @@
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/><path d="M20 15v5h-5"/></svg>
                 </button>
             </div>
+
+
+            <!-- Options de téléchargement (Qualité & Format) intégrées proprement -->
+            <div class="download-options" id="downloadOptions" hidden>
+                <select id="qualitySelect" class="select-sm" aria-label="Qualité">
+                    <option value="best">Max (Auto)</option>
+                    <option value="1080">1080p (HD)</option>
+                    <option value="720">720p (SD)</option>
+                    <option value="360">360p (Low)</option>
+                </select>
+                <select id="formatSelect" class="select-sm" aria-label="Format">
+                    <option value="mp4">MP4</option>
+                    <option value="mkv">MKV</option>
+                </select>
+            </div>
         </section>
 
         <section class="player" id="playerBox">
@@ -86,12 +101,21 @@
             open: document.getElementById('openBtn'),
             copy: document.getElementById('copyBtn'),
             download: document.getElementById('downloadBtn'),
+            downloadOptions: document.getElementById('downloadOptions'),
+            quality: document.getElementById('qualitySelect'),
+            format: document.getElementById('formatSelect'),
             box: document.getElementById('playerBox'),
             fs: document.getElementById('fsBtn'),
             fsExit: document.getElementById('fsExit'),
         };
 
         const state = { links: [], active: 0 };
+
+        function setDownloadUi(isOpen) {
+            el.downloadOptions.hidden = !isOpen;
+            el.download.title = isOpen ? 'Valider le téléchargement' : 'Télécharger la source';
+            el.download.setAttribute('aria-label', isOpen ? 'Valider le téléchargement' : 'Télécharger la source');
+        }
 
         el.title.textContent = animeTitle;
         el.meta.textContent = `${seasonName} · Épisode ${epNum} · ${lang.toUpperCase()}`;
@@ -166,11 +190,13 @@
             }, 1800);
         });
 
-        el.download.addEventListener('click', async () => {
+        async function startDownload() {
             const link = state.links[state.active];
             if (!link) return;
 
-            const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.mp4`;
+            const quality = el.quality.value || 'best';
+            const format = el.format.value || 'mp4';
+            const filename = `${(animeTitle || 'anime').replace(/[^a-z0-9-_]+/gi, '_').replace(/_+/g, '_').replace(/^_|_$/g, '')}-ep${epNum}.${format}`;
             el.download.disabled = true;
             el.download.title = 'Téléchargement...';
             showState('Téléchargement en cours…');
@@ -179,7 +205,7 @@
                 const response = await fetch('/api/download', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: link.url.trim(), filename })
+                    body: JSON.stringify({ url: link.url.trim(), filename, quality, format })
                 });
                 const data = await response.json();
 
@@ -202,8 +228,18 @@
                 showState('Impossible de démarrer le téléchargement.', true);
             } finally {
                 el.download.disabled = false;
+                setDownloadUi(false);
                 el.download.title = 'Télécharger la source';
+                el.download.setAttribute('aria-label', 'Télécharger la source');
             }
+        }
+
+        el.download.addEventListener('click', () => {
+            if (el.downloadOptions.hidden) {
+                setDownloadUi(true);
+                return;
+            }
+            startDownload();
         });
 
         // ---- Plein écran paysage ----

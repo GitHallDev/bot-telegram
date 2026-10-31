@@ -453,8 +453,9 @@ app.get('/api/episodes', async (req, res) => {
   }
 });
 
+
 app.post('/api/download', async (req, res) => {
-  const { url, filename } = req.body || {};
+  const { url, filename, quality, format } = req.body || {};
 
   if (!url) {
     return res.status(400).json({ success: false, error: 'URL manquante.' });
@@ -467,7 +468,7 @@ app.post('/api/download', async (req, res) => {
   const outputPath = path.join(__dirname, 'downloads', safeFilename || 'anime-download.mp4');
 
   try {
-    await downloadVideo(String(url), outputPath);
+    await downloadVideo(String(url), outputPath, String(quality || 'best'), String(format || 'mp4'));
     return res.json({
       success: true,
       filename: safeFilename,

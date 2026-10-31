@@ -20,7 +20,15 @@
             <select id="sourceSelect" class="select" aria-label="Lecteur">
                 <option>Chargement…</option>
             </select>
-            <a id="sourceLink" class="source-link" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+            <div class="source-actions" id="sourceActions" hidden>
+                <a id="openBtn" class="icon-btn" href="#" target="_blank" rel="noopener noreferrer" title="Ouvrir la source" aria-label="Ouvrir la source dans un nouvel onglet">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                </a>
+                <button id="copyBtn" class="icon-btn" type="button" title="Copier le lien" aria-label="Copier le lien de la source">
+                    <svg class="ico-copy" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>
+                    <svg class="ico-check" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                </button>
+            </div>
         </section>
 
         <section class="player" id="playerBox">
@@ -65,7 +73,9 @@
             player: document.getElementById('videoPlayer'),
             state: document.getElementById('playerState'),
             select: document.getElementById('sourceSelect'),
-            link: document.getElementById('sourceLink'),
+            actions: document.getElementById('sourceActions'),
+            open: document.getElementById('openBtn'),
+            copy: document.getElementById('copyBtn'),
         };
 
         const state = { links: [], active: 0 };
@@ -103,13 +113,45 @@
             state.active = index;
             const url = link.url.trim();
             el.select.value = String(index);
-            el.link.href = url;
-            el.link.textContent = url;
-            el.link.title = url;
-            el.link.hidden = false;
+            el.open.href = url;
+            el.actions.hidden = false;
+            el.copy.classList.remove('is-copied');
             showState('Chargement du lecteur…');
             el.player.src = url;
         }
+
+        async function copyText(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } catch (e) {
+                // Repli pour les WebViews sans API presse-papiers (ex. Telegram)
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0;';
+                document.body.appendChild(ta);
+                ta.select();
+                let ok = false;
+                try { ok = document.execCommand('copy'); } catch (err) { /* ignoré */ }
+                ta.remove();
+                return ok;
+            }
+        }
+
+        let copyTimer;
+        el.copy.addEventListener('click', async () => {
+            const link = state.links[state.active];
+            if (!link) return;
+            const ok = await copyText(link.url.trim());
+            if (!ok) return;
+            el.copy.classList.add('is-copied');
+            el.copy.title = 'Lien copié';
+            clearTimeout(copyTimer);
+            copyTimer = setTimeout(() => {
+                el.copy.classList.remove('is-copied');
+                el.copy.title = 'Copier le lien';
+            }, 1800);
+        });
 
         el.select.addEventListener('change', (e) => loadSource(Number(e.target.value)));
 

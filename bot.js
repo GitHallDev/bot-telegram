@@ -480,6 +480,47 @@ app.post('/api/download', async (req, res) => {
   }
 });
 
+// Route pour estimer la taille de la vidéo en fonction de la qualité et du format
+app.get('/api/video-size', async (req, res) => {
+  const { url, quality, format } = req.query;
+  if (!url) return res.status(400).json({ success: false, error: 'URL manquante' });
+
+    // On pointe explicitement vers le binaire yt-dlp téléchargé à la racine du projet
+    const ytDlpPath = path.join(__dirname, 'yt-dlp');
+  
+  // Construction du format selon les critères choisis
+  let formatArg = '';
+  if (quality === '360') {
+    formatArg = `-f "bestvideo[height<=360][ext=${format}]+bestaudio/best[height<=360] / best[height<=360]"`;
+  } else if (quality === '720') {
+    formatArg = `-f "bestvideo[height<=720][ext=${format}]+bestaudio/best[height<=720] / best[height<=720]"`;
+  } else if (quality === '1080') {
+    formatArg = `-f "bestvideo[height<=1080][ext=${format}]+bestaudio/best[height<=1080] / best[height<=1080]"`;
+  } else {
+    formatArg = `-f "bv*[ext=${format}]+ba/b[ext=${format}] / b"`;
+  }
+
+  // Commande yt-dlp pour simuler et afficher la taille du fichier (--print filesize)
+  const command = `"${ytDlpPath}" ${formatArg} --print filesize "${url}"`;
+
+  exec(command, (error, stdout, stderr) => {
+    if (error) {
+      return res.json({ success: true, size: 'Inconnue' });
+    }
+
+    const bytes = parseInt(stdout.trim(), 10);
+    if (isNaN(bytes) || bytes <= 0) {
+      return res.json({ success: true, size: 'Estimation indisponible' });
+    }
+
+    // Convertir les octets en Mo ou Go de manière propre
+    const sizeMb = (bytes / (1024 * 1024)).toFixed(1);
+    const formattedSize = sizeMb > 1024 ? (sizeMb / 1024).toFixed(2) + ' Go' : sizeMb + ' Mo';
+
+    res.json({ success: true, size: formattedSize });
+  });
+});
+
 // ───────────── Lancement ─────────────
 bot.catch((err, ctx) => console.error(`Erreur [${ctx.updateType}] :`, err));
 

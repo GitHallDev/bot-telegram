@@ -14,7 +14,9 @@ function downloadVideo(embedUrl, outputPath, quality = 'best', format = 'mp4') {
   return new Promise((resolve, reject) => {
     const safeOutput = outputPath.replace(/"/g, '\\"');
     const safeUrl = embedUrl.replace(/"/g, '\\"');
-    const ytDlpPath = '/opt/render/project/src/yt-dlp';
+    
+    // On pointe explicitement vers le binaire yt-dlp téléchargé à la racine du projet
+    const ytDlpPath = path.join(__dirname, 'yt-dlp');
 
     // Construction dynamique de l'option de format / qualité pour yt-dlp
     let formatArg = '';

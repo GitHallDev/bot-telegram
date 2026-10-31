@@ -20,7 +20,13 @@
         <div class="player-window">
             <div class="video-title" id="videoTitle">Chargement...</div>
 
-            <video id="videoPlayer" playsinline preload="metadata" controls="false"></video>
+            <iframe
+                id="videoPlayer"
+                title="Lecteur vidéo"
+                allow="autoplay; fullscreen; picture-in-picture"
+                referrerpolicy="no-referrer-when-downgrade"
+                loading="lazy"
+            ></iframe>
 
             <div class="controls-panel">
                 <div class="time-row">
@@ -123,8 +129,13 @@
 
             const safeUrl = link.url.trim();
             videoPlayer.src = safeUrl;
-            videoPlayer.load();
-            videoPlayer.play().catch(() => {});
+            if (videoPlayer.contentWindow) {
+                try {
+                    videoPlayer.contentWindow.focus();
+                } catch (e) {
+                    // Certaines sources ne permettent pas le focus direct via iframe.
+                }
+            }
         }
 
         async function fetchEpisodeLinks() {
@@ -163,52 +174,21 @@
         });
 
         playBtn.addEventListener('click', () => {
-            if (videoPlayer.paused) {
-                videoPlayer.play().catch(() => {});
-            } else {
-                videoPlayer.pause();
-            }
-        });
-
-        videoPlayer.addEventListener('play', () => {
-            playBtn.textContent = '⏸';
-        });
-
-        videoPlayer.addEventListener('pause', () => {
-            playBtn.textContent = '▶';
-        });
-
-        videoPlayer.addEventListener('loadedmetadata', () => {
-            const total = videoPlayer.duration || 0;
-            durationTimeEl.textContent = formatTime(total);
-            progressBar.max = total || 100;
-        });
-
-        videoPlayer.addEventListener('timeupdate', () => {
-            const current = videoPlayer.currentTime || 0;
-            const total = videoPlayer.duration || 0;
-            currentTimeEl.textContent = formatTime(current);
-            durationTimeEl.textContent = formatTime(total);
-            if (total > 0) {
-                progressBar.value = current;
-                progressBar.max = total;
-            }
+            const link = state.links[state.active];
+            if (link) window.open(link.url, '_blank', 'noopener,noreferrer');
         });
 
         progressBar.addEventListener('input', () => {
-            if (videoPlayer.duration) {
-                videoPlayer.currentTime = Number(progressBar.value);
-            }
+            // Le lecteur est intégralement affiché dans un iframe, donc la barre de progression
+            // est stylée comme un contrôle visuel mais la lecture reste pilotée par la source embed.
+            const value = Number(progressBar.value);
+            progressBar.style.setProperty('--value', `${(value / (progressBar.max || 100)) * 100}%`);
         });
 
         volumeBar.addEventListener('input', () => {
             const value = Number(volumeBar.value) / 100;
-            videoPlayer.volume = value;
-            videoPlayer.muted = value === 0;
+            volumeBar.style.setProperty('--value', `${value * 100}%`);
         });
-
-        videoPlayer.volume = 0.8;
-        videoPlayer.muted = false;
         document.getElementById('sourceBtn').addEventListener('click', () => {
             sourceSelect.focus();
         });

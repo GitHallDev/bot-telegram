@@ -18,7 +18,7 @@ Bot Telegram pour rechercher, parcourir et ouvrir des épisodes d’anime via le
 - `bot.js` : point d’entrée du bot Telegram et du serveur Express
 - `public/index.html` : Mini App web
 - `public/style.css` : styles de la Mini App
-- `public/app.js` : utilitaire de téléchargement côté serveur
+- `app.js` : utilitaire de téléchargement côté serveur
 - `downloads/` : dossier de sortie des vidéos téléchargées
 
 ## Prérequis

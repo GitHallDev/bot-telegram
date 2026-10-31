@@ -3,7 +3,7 @@ require('dotenv').config();
 const { Telegraf, Markup } = require('telegraf');
 const express = require('express');
 const path = require('path');
-const { downloadVideo } = require('./public/app.js');
+const { downloadVideo } = require('./app.js');
 
 // ───────────── Config ─────────────
 const BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;

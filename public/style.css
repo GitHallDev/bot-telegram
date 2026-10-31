@@ -94,6 +94,7 @@ html, body {
 .sources {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 12px;
     margin-bottom: 16px;
     min-width: 0;
@@ -118,6 +119,7 @@ html, body {
 
 .source-actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
@@ -126,6 +128,7 @@ html, body {
 .download-options {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 8px;
     margin-left: auto;
 }
@@ -161,7 +164,16 @@ html, body {
     transition: background 0.15s ease, color 0.15s ease;
 }
 
+.validate-btn {
+    width: 42px;
+    height: 42px;
+    background: rgba(94, 224, 138, 0.12);
+    color: #7ef0a0;
+}
+
 .icon-btn:hover { background: var(--surface-hover); }
+
+.validate-btn:hover { background: rgba(94, 224, 138, 0.2); }
 
 .icon-btn .ico-check { display: none; }
 .icon-btn.is-copied { color: #5ee08a; }

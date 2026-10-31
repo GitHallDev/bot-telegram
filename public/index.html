@@ -49,6 +49,9 @@
                     <option value="mp4">MP4</option>
                     <option value="mkv">MKV</option>
                 </select>
+                <button id="validateDownloadBtn" class="icon-btn validate-btn" type="button" title="Valider le téléchargement" aria-label="Valider le téléchargement">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                </button>
             </div>
         </section>
 
@@ -102,6 +105,7 @@
             copy: document.getElementById('copyBtn'),
             download: document.getElementById('downloadBtn'),
             downloadOptions: document.getElementById('downloadOptions'),
+            validateDownload: document.getElementById('validateDownloadBtn'),
             quality: document.getElementById('qualitySelect'),
             format: document.getElementById('formatSelect'),
             box: document.getElementById('playerBox'),
@@ -241,6 +245,8 @@
             }
             startDownload();
         });
+
+        el.validateDownload.addEventListener('click', startDownload);
 
         // ---- Plein écran paysage ----
         const fs = { active: false, pseudo: false, tgFs: false };

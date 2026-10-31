@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
-const YT_DLP_PATH = process.env.YT_DLP_PATH || 'yt-dlp';
+const YT_DLP_PATH = path.join(__dirname, 'yt-dlp');
 
 function ensureDirectory(dirPath) {
   if (!dirPath || dirPath === '.') return;

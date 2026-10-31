@@ -14,7 +14,7 @@ if (!BOT_TOKEN) {
   process.exit(1);
 }
 
-const YT_DLP_PATH = process.env.YT_DLP_PATH || 'yt-dlp';
+const YT_DLP_PATH = path.join(__dirname, 'yt-dlp');
 const PORT = process.env.PORT || 3000; // 👈 Port pour le serveur web / Mini App
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 // Le domaine change souvent : on le rend configurable

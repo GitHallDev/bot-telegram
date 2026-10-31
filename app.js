@@ -2,6 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
+const YT_DLP_PATH = process.env.YT_DLP_PATH || 'yt-dlp';
+
 function ensureDirectory(dirPath) {
   if (!dirPath || dirPath === '.') return;
   fs.mkdirSync(dirPath, { recursive: true });
@@ -28,33 +30,24 @@ function parseYtDlpFormats(rawOutput) {
   const seen = new Set();
   const formats = [];
 
-  for (const line of text.split(/\r?\n/)) {
-    const cleaned = line.trim();
-    if (!cleaned || cleaned.startsWith('formats:') || cleaned.startsWith('WARNING') || cleaned.includes('error') || cleaned.includes('ERROR')) {
-      continue;
-    }
+  const parsePipeLine = (line) => {
+    const parts = line.split('|').map((p) => p.trim());
+    if (parts.length < 4) return null;
 
-    const parts = cleaned.split('|');
-    if (parts.length < 2) continue;
-
-    const [idRaw, extRaw = '', resolutionRaw = '', fpsRaw = '', filesizeRaw = '', filesizeApproxRaw = '', bitrateRaw = '', protocolRaw = '', videoCodecRaw = '', audioCodecRaw = ''] = parts;
+    const [idRaw, extRaw = '', resolutionRaw = '', fpsRaw = '', ...rest] = parts;
     const id = String(idRaw || '').trim();
     const ext = String(extRaw || '').trim().toLowerCase();
-    if (!id || !ext) continue;
+    if (!id || !ext || id.toLowerCase().includes('audio')) return null;
 
-    const normalizedId = id.toLowerCase();
-    if (normalizedId.includes('audio only') || normalizedId.includes('audio')) continue;
-
+    const [filesizeRaw = '', filesizeApproxRaw = '', bitrateRaw = '', protocolRaw = '', videoCodecRaw = '', audioCodecRaw = ''] = rest;
     const resolution = String(resolutionRaw || '').trim();
     const parsedHeight = Number.parseInt((resolution.match(/(\d+)x(\d+)/)?.[2] || resolution.match(/(\d+)/)?.[1] || '') || '', 10);
     const height = Number.isFinite(parsedHeight) ? parsedHeight : null;
-    const filesize = Number.parseInt(filesizeRaw, 10) || null;
-    const filesizeApprox = Number.parseInt(filesizeApproxRaw, 10) || null;
+    const filesize = Number.parseInt(filesizeRaw, 10) || Number.parseInt(filesizeApproxRaw, 10) || null;
+    const filesizeApprox = Number.parseInt(filesizeApproxRaw, 10) || filesize;
     const label = height ? `${height}p ${ext.toUpperCase()}` : `${ext.toUpperCase()} ${String(fpsRaw || '').trim() || 'video'}`.trim();
 
-    const sizeLabel = formatSizeLabel(filesize, filesizeApprox);
-
-    const item = {
+    return {
       id,
       ext,
       height,
@@ -66,10 +59,65 @@ function parseYtDlpFormats(rawOutput) {
       audioCodec: audioCodecRaw || null,
       filesize,
       filesizeApprox,
-      sizeLabel,
+      sizeLabel: formatSizeLabel(filesize, filesizeApprox),
       label,
     };
+  };
 
+  const parseTableLine = (line) => {
+    const match = line.match(/^(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+\|\s*(.*?)\s+\|\s*(.*?)\s*$/);
+    if (!match) return null;
+
+    const [, idRaw, extRaw, resolutionRaw, fpsRaw, middleRaw, codecRaw] = match;
+    const id = String(idRaw || '').trim();
+    const ext = String(extRaw || '').trim().toLowerCase();
+    const resolution = String(resolutionRaw || '').trim();
+    if (!id || !ext || id.toLowerCase().includes('audio')) return null;
+
+    const heightValue = Number.parseInt((resolution.match(/(\d+)x(\d+)/)?.[2] || resolution.match(/(\d+)/)?.[1] || '') || '', 10);
+    const height = Number.isFinite(heightValue) && heightValue > 0 ? heightValue : null;
+    const sizeMatch = middleRaw.match(/([0-9.]+)\s*([KMG]?i?B)/i);
+    const sizeBytes = sizeMatch ? Number.parseFloat(sizeMatch[1]) * (
+      sizeMatch[2].toLowerCase().includes('g') ? 1024 * 1024 * 1024 :
+      sizeMatch[2].toLowerCase().includes('m') ? 1024 * 1024 :
+      sizeMatch[2].toLowerCase().includes('k') ? 1024 : 1
+    ) : null;
+    const bitrateMatch = middleRaw.match(/([0-9.]+)\s*([kKmMgG])/);
+    const bitrate = bitrateMatch ? `${bitrateMatch[1]}${bitrateMatch[2]}` : null;
+    const protocol = (middleRaw.match(/\b([a-z0-9_]+)\s*$/i)?.[1] || null);
+    const codecParts = String(codecRaw || '').trim().split(/\s+/).filter(Boolean);
+    const videoCodec = codecParts[0] || null;
+    const audioCodec = codecParts[1] || null;
+    const label = height ? `${height}p ${ext.toUpperCase()}` : `${ext.toUpperCase()} ${String(fpsRaw || '').trim() || 'video'}`.trim();
+
+    return {
+      id,
+      ext,
+      height,
+      resolution,
+      fps: fpsRaw || null,
+      bitrate,
+      protocol,
+      videoCodec,
+      audioCodec,
+      filesize: sizeBytes,
+      filesizeApprox: sizeBytes,
+      sizeLabel: formatSizeLabel(sizeBytes, sizeBytes),
+      label,
+    };
+  };
+
+  for (const line of text.split(/\r?\n/)) {
+    const cleaned = line.trim();
+    if (!cleaned || cleaned.startsWith('WARNING') || cleaned.includes('error') || cleaned.includes('ERROR') || cleaned.startsWith('ID') || cleaned.startsWith('Available formats') || cleaned.startsWith('---')) {
+      continue;
+    }
+
+    const item = cleaned.includes('|') && !cleaned.includes(' | ')
+      ? parsePipeLine(cleaned)
+      : parseTableLine(cleaned);
+
+    if (!item) continue;
     const key = `${item.id}|${item.ext}|${item.height ?? 'na'}|${item.resolution}`;
     if (!seen.has(key)) {
       seen.add(key);
@@ -109,7 +157,7 @@ function downloadVideo(embedUrl, outputPath, quality = 'best', format = 'mp4', f
   return new Promise((resolve, reject) => {
     const safeOutput = outputPath.replace(/"/g, '\\"');
     const safeUrl = embedUrl.replace(/"/g, '\\"');
-    const ytDlpPath = path.join(__dirname, 'yt-dlp');
+    const ytDlpPath = YT_DLP_PATH;
     const formatArg = buildYtDlpFormatArg({ quality, format, formatId });
     const command = `"${ytDlpPath}" ${formatArg} -o "${safeOutput}" "${safeUrl}"`;
 

@@ -14,6 +14,7 @@ if (!BOT_TOKEN) {
   process.exit(1);
 }
 
+const YT_DLP_PATH = process.env.YT_DLP_PATH || 'yt-dlp';
 const PORT = process.env.PORT || 3000; // 👈 Port pour le serveur web / Mini App
 const SERVER_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
 // Le domaine change souvent : on le rend configurable
@@ -460,9 +461,9 @@ app.get('/api/formats', (req, res) => {
   const { url } = req.query;
   if (!url) return res.status(400).json({ success: false, error: 'URL manquante.' });
 
-  const ytDlpPath = path.join(__dirname, 'yt-dlp');
+  const ytDlpPath = YT_DLP_PATH;
   const safeUrl = String(url).replace(/"/g, '\\"');
-  const command = `"${ytDlpPath}" --no-warnings --print "formats:%(format_id)s|%(ext)s|%(resolution)s|%(fps)s|%(filesize,filesize_approx)s|%(tbr)s|%(protocol)s|%(vcodec)s|%(acodec)s" "${safeUrl}"`;
+  const command = `"${ytDlpPath}" --no-warnings --all-formats --print "%(format_id)s|%(ext)s|%(resolution)s|%(fps)s|%(filesize)s|%(filesize_approx)s|%(tbr)s|%(protocol)s|%(vcodec)s|%(acodec)s" "${safeUrl}"`;
 
   console.log('Commande yt-dlp formats :', command);
   exec(command, (error, stdout, stderr) => {
@@ -473,7 +474,7 @@ app.get('/api/formats', (req, res) => {
     console.log('yt-dlp formats output:', stdout);
 
     const formats = parseYtDlpFormats(stdout)
-      .filter((format) => format.height || format.note)
+      .filter((format) => Number.isFinite(format.height) && format.height > 0)
       .slice(0, 24);
     console.log('Formats parsés :', formats);
     return res.json({ success: true, formats });
@@ -589,7 +590,7 @@ app.get('/api/video-size', (req, res) => {
   const { url, quality, format, formatId } = req.query;
   if (!url) return res.status(400).json({ success: false, error: 'URL manquante' });
 
-  const ytDlpPath = path.join(__dirname, 'yt-dlp');
+  const ytDlpPath = YT_DLP_PATH;
   const safeUrl = String(url).replace(/"/g, '\\"');
 
   const command = formatId

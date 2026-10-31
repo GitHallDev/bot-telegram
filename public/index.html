@@ -37,30 +37,27 @@
             </div>
 
 
-            <!-- Options de téléchargement (Qualité & Format) intégrées proprement -->
+            <!-- Options de téléchargement (Qualité & Format) -->
             <div class="download-options" id="downloadOptions" hidden>
-                <div class="download-row"></div>
-                <select id="qualitySelect" class="select-sm" aria-label="Qualité">
-                    <option value="best">Max (Auto)</option>
-                    <option value="1080">1080p (HD)</option>
-                    <option value="720">720p (SD)</option>
-                    <option value="360">360p (Low)</option>
-                </select>
-                <select id="formatSelect" class="select-sm" aria-label="Format">
-                    <option value="mp4">MP4</option>
-                    <option value="mkv">MKV</option>
-                </select>
-                <button id="closeDownloadBtn" class="icon-btn-sm" type="button" title="Masquer les options" aria-label="Masquer les options">
+                <div class="download-row">
+                    <select id="qualitySelect" class="select-sm" aria-label="Qualité">
+                        <option value="best">Max (Auto)</option>
+                        <option value="1080">1080p (HD)</option>
+                        <option value="720">720p (SD)</option>
+                        <option value="360">360p (Low)</option>
+                    </select>
+                    <select id="formatSelect" class="select-sm" aria-label="Format">
+                        <option value="mp4">MP4</option>
+                        <option value="mkv">MKV</option>
+                    </select>
+                    <button id="closeDownloadBtn" class="icon-btn-sm" type="button" title="Masquer les options" aria-label="Masquer les options">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
-                <button id="validateDownloadBtn" class="icon-btn validate-btn" type="button" title="Valider le téléchargement" aria-label="Valider le téléchargement">
-                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
-                </button>
+                    <button id="validateDownloadBtn" class="icon-btn validate-btn" type="button" title="Valider le téléchargement" aria-label="Valider le téléchargement">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+                    </button>
                 </div>
-                <div class="download-info">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12v6M12 6l-6 6 6-6 6 6-6-6z"/></svg>
-                    <button id="validateDownloadBtn" class="btn-primary-sm" type="button">Lancer le téléchargement</button>
-                </div>
+                <div id="videoSizeText" class="download-size">📊 Taille estimée : calcul…</div>
             </div>
         </section>
 
@@ -114,8 +111,8 @@
             copy: document.getElementById('copyBtn'),
             download: document.getElementById('downloadBtn'),
             downloadOptions: document.getElementById('downloadOptions'),
-            closeDownload: document.getElementById('closeDownloadBtn'), // Ajout
-            sizeText: document.getElementById('videoSizeText'),         // Ajout
+            closeDownload: document.getElementById('closeDownloadBtn'),
+            sizeText: document.getElementById('videoSizeText'),
             validateDownload: document.getElementById('validateDownloadBtn'),
             quality: document.getElementById('qualitySelect'),
             format: document.getElementById('formatSelect'),
@@ -124,14 +121,19 @@
             fsExit: document.getElementById('fsExit'),
         };
 
-        // Fonction pour récupérer la taille estimée auprès du serveur
+        const state = { links: [], active: 0 };
+
         async function updateVideoSize() {
+            if (!el.sizeText) return;
             const link = state.links[state.active];
-            if (!link) return;
+            if (!link) {
+                el.sizeText.textContent = '📊 Taille estimée : non disponible';
+                return;
+            }
 
             const quality = el.quality.value;
             const format = el.format.value;
-            el.sizeText.textContent = '📊 Taille estimée : Calcul en cours...';
+            el.sizeText.textContent = '📊 Taille estimée : calcul…';
 
             try {
                 const response = await fetch(`/api/video-size?url=${encodeURIComponent(link.url.trim())}&quality=${quality}&format=${format}`);
@@ -139,27 +141,20 @@
                 if (data.success) {
                     el.sizeText.textContent = `📊 Taille estimée : ${data.size}`;
                 } else {
-                    el.sizeText.textContent = '📊 Taille estimée : Non disponible';
+                    el.sizeText.textContent = '📊 Taille estimée : non disponible';
                 }
             } catch (e) {
-                el.sizeText.textContent = '📊 Taille estimée : Erreur de calcul';
+                el.sizeText.textContent = '📊 Taille estimée : erreur de calcul';
             }
         }
-
-        // Gestion de l'ouverture/fermeture du panneau d'options
-        function setDownloadUi(isOpen) {
-            el.downloadOptions.hidden = !isOpen;
-            if (isOpen) {
-                updateVideoSize(); // Calculer la taille dès l'ouverture
-            }
-        }
-
-        const state = { links: [], active: 0 };
 
         function setDownloadUi(isOpen) {
             el.downloadOptions.hidden = !isOpen;
             el.download.title = isOpen ? 'Valider le téléchargement' : 'Télécharger la source';
             el.download.setAttribute('aria-label', isOpen ? 'Valider le téléchargement' : 'Télécharger la source');
+            if (isOpen) {
+                updateVideoSize();
+            }
         }
 
         el.title.textContent = animeTitle;

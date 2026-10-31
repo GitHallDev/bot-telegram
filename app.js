@@ -15,6 +15,12 @@ function formatBytes(bytes) {
   return `${mb.toFixed(1)} Mo`;
 }
 
+function formatSizeLabel(filesize, filesizeApprox) {
+  const value = Number(filesize) || Number(filesizeApprox) || 0;
+  if (!value) return 'taille inconnue';
+  return formatBytes(value);
+}
+
 function parseYtDlpFormats(rawOutput) {
   const text = String(rawOutput || '').trim();
   if (!text) return [];
@@ -24,14 +30,14 @@ function parseYtDlpFormats(rawOutput) {
 
   for (const line of text.split(/\r?\n/)) {
     const cleaned = line.trim();
-    if (!cleaned || cleaned.startsWith('format_id') || cleaned.startsWith('WARNING') || cleaned.includes('error') || cleaned.includes('ERROR')) {
+    if (!cleaned || cleaned.startsWith('formats:') || cleaned.startsWith('WARNING') || cleaned.includes('error') || cleaned.includes('ERROR')) {
       continue;
     }
 
     const parts = cleaned.split('|');
     if (parts.length < 2) continue;
 
-    const [idRaw, extRaw, heightRaw = '', noteRaw = '', filesizeRaw = '', filesizeApproxRaw = ''] = parts;
+    const [idRaw, extRaw = '', resolutionRaw = '', fpsRaw = '', filesizeRaw = '', filesizeApproxRaw = '', bitrateRaw = '', protocolRaw = '', videoCodecRaw = '', audioCodecRaw = ''] = parts;
     const id = String(idRaw || '').trim();
     const ext = String(extRaw || '').trim().toLowerCase();
     if (!id || !ext) continue;
@@ -39,25 +45,32 @@ function parseYtDlpFormats(rawOutput) {
     const normalizedId = id.toLowerCase();
     if (normalizedId.includes('audio only') || normalizedId.includes('audio')) continue;
 
-    const height = Number.parseInt(heightRaw, 10);
-    if (!Number.isFinite(height) || height <= 0) continue;
-
+    const resolution = String(resolutionRaw || '').trim();
+    const parsedHeight = Number.parseInt((resolution.match(/(\d+)x(\d+)/)?.[2] || resolution.match(/(\d+)/)?.[1] || '') || '', 10);
+    const height = Number.isFinite(parsedHeight) ? parsedHeight : null;
     const filesize = Number.parseInt(filesizeRaw, 10) || null;
     const filesizeApprox = Number.parseInt(filesizeApproxRaw, 10) || null;
-    const note = String(noteRaw || '').trim();
-    const label = `${height}p ${ext.toUpperCase()}`;
+    const label = height ? `${height}p ${ext.toUpperCase()}` : `${ext.toUpperCase()} ${String(fpsRaw || '').trim() || 'video'}`.trim();
+
+    const sizeLabel = formatSizeLabel(filesize, filesizeApprox);
 
     const item = {
       id,
       ext,
       height,
-      note,
+      resolution,
+      fps: fpsRaw || null,
+      bitrate: bitrateRaw || null,
+      protocol: protocolRaw || null,
+      videoCodec: videoCodecRaw || null,
+      audioCodec: audioCodecRaw || null,
       filesize,
       filesizeApprox,
+      sizeLabel,
       label,
     };
 
-    const key = `${item.id}|${item.ext}|${item.height}`;
+    const key = `${item.id}|${item.ext}|${item.height ?? 'na'}|${item.resolution}`;
     if (!seen.has(key)) {
       seen.add(key);
       formats.push(item);

@@ -128,6 +128,17 @@
             return state.formats.find((format) => String(format.id) === String(selectedId)) || null;
         }
 
+        function formatOptionLabel(format) {
+            const height = format?.height ? `${format.height}p` : 'Qualité';
+            const ext = format?.ext ? format.ext.toUpperCase() : 'VIDEO';
+            const meta = [];
+            if (format?.sizeLabel && format.sizeLabel !== 'taille inconnue') meta.push(format.sizeLabel);
+            if (format?.fps) meta.push(`${format.fps} fps`);
+            if (format?.videoCodec) meta.push(format.videoCodec.toUpperCase());
+            const details = meta.length ? ` • ${meta.join(' • ')}` : '';
+            return `${height} ${ext}${details}`;
+        }
+
         function populateQualityOptions(formats) {
             state.formats = Array.isArray(formats) ? formats : [];
             if (!state.formats.length) {
@@ -137,7 +148,7 @@
             }
 
             el.quality.innerHTML = state.formats
-                .map((format) => `<option value="${format.id}">${format.label || `${format.height || 'Best'}p`}</option>`)
+                .map((format) => `<option value="${format.id}">${formatOptionLabel(format)}</option>`)
                 .join('');
             el.quality.value = String(state.formats[0].id);
         }

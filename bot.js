@@ -462,7 +462,8 @@ app.get('/api/formats', (req, res) => {
 
   const ytDlpPath = path.join(__dirname, 'yt-dlp');
   const safeUrl = String(url).replace(/"/g, '\\"');
-  const command = `"${ytDlpPath}" --no-warnings --print "%(format_id)s|%(ext)s|%(height)s|%(format_note)s|%(filesize)s|%(filesize_approx)s" "${safeUrl}"`;
+  const command = `"${ytDlpPath}" --no-warnings --print "formats:%(format_id)s|%(ext)s|%(resolution)s|%(fps)s|%(filesize,filesize_approx)s|%(tbr)s|%(protocol)s|%(vcodec)s|%(acodec)s" "${safeUrl}"`;
+
   console.log('Commande yt-dlp formats :', command);
   exec(command, (error, stdout, stderr) => {
     if (error) {

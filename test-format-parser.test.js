@@ -4,11 +4,10 @@ const { parseYtDlpFormats } = require('./app.js');
 
 test('parseYtDlpFormats parses yt-dlp rows into usable video formats', () => {
   const raw = [
-    'format_id|ext|height|filesize|filesize_approx|format_note',
-    '18|mp4|360||4200000|360p',
-    '22|mp4|720||7100000|720p',
-    '313|webm|1080|||2160p',
-    'audio only|m4a|||1024000|audio',
+    '18|mp4|640x360|30|4200000|600|https|h264|aac',
+    '22|mp4|1280x720|30|7100000|1200|https|h264|aac',
+    '313|webm|1920x1080|30||10240000|https|vp9|opus',
+    'audio only|m4a|0x0|0||1024000|0|https|none|aac',
   ].join('\n');
 
   const formats = parseYtDlpFormats(raw);

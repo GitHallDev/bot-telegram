@@ -15,9 +15,12 @@
             <p id="episodeMeta" class="meta"></p>
         </header>
 
-        <section class="sources" aria-labelledby="sourcesLabel">
-            <h2 id="sourcesLabel">Lecteurs</h2>
-            <div class="chips" id="sourceList" role="radiogroup" aria-labelledby="sourcesLabel"></div>
+        <section class="sources">
+            <label class="sr-only" for="sourceSelect">Lecteur</label>
+            <select id="sourceSelect" class="select" aria-label="Lecteur">
+                <option>Chargement…</option>
+            </select>
+            <a id="sourceLink" class="source-link" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
         </section>
 
         <section class="player" id="playerBox">
@@ -61,7 +64,8 @@
             meta: document.getElementById('episodeMeta'),
             player: document.getElementById('videoPlayer'),
             state: document.getElementById('playerState'),
-            sources: document.getElementById('sourceList'),
+            select: document.getElementById('sourceSelect'),
+            link: document.getElementById('sourceLink'),
         };
 
         const state = { links: [], active: 0 };
@@ -84,16 +88,12 @@
         }
 
         function renderSources() {
-            el.sources.innerHTML = '';
+            el.select.innerHTML = '';
             state.links.forEach((link, index) => {
-                const chip = document.createElement('button');
-                chip.type = 'button';
-                chip.className = 'chip';
-                chip.setAttribute('role', 'radio');
-                chip.setAttribute('aria-checked', String(index === state.active));
-                chip.textContent = link.host;
-                chip.addEventListener('click', () => loadSource(index));
-                el.sources.appendChild(chip);
+                const opt = document.createElement('option');
+                opt.value = String(index);
+                opt.textContent = link.host;
+                el.select.appendChild(opt);
             });
         }
 
@@ -101,12 +101,17 @@
             const link = state.links[index];
             if (!link) return;
             state.active = index;
+            const url = link.url.trim();
+            el.select.value = String(index);
+            el.link.href = url;
+            el.link.textContent = url;
+            el.link.title = url;
+            el.link.hidden = false;
             showState('Chargement du lecteur…');
-            el.player.src = link.url.trim();
-            [...el.sources.children].forEach((chip, i) =>
-                chip.setAttribute('aria-checked', String(i === index))
-            );
+            el.player.src = url;
         }
+
+        el.select.addEventListener('change', (e) => loadSource(Number(e.target.value)));
 
         el.player.addEventListener('load', () => {
             if (el.player.getAttribute('src')) hideState();

@@ -91,51 +91,63 @@ html, body {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Sources (au-dessus du lecteur) */
-.sources { margin-bottom: 16px; }
-
-.sources h2 {
-    margin: 0 0 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-}
-
-.chips {
+.sources {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    min-width: 0;
 }
 
-.chip {
-    padding: 10px 18px;
+.select {
+    flex: none;
+    min-width: 160px;
+    padding: 10px 40px 10px 14px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 999px;
-    background: var(--surface);
+    border-radius: var(--radius);
+    background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' fill='none' stroke='%23f4f4f6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E") no-repeat right 14px center;
     color: var(--text);
     font: inherit;
-    font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    appearance: none;
+    -webkit-appearance: none;
 }
 
-.chip:hover { background: var(--surface-hover); }
+.select:hover { background-color: var(--surface-hover); }
 
-.chip[aria-checked="true"] {
-    background: var(--text);
-    border-color: var(--text);
-    color: #0d0d0f;
-    font-weight: 600;
+.source-link {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-decoration: none;
+}
+
+.source-link:hover { color: var(--accent); text-decoration: underline; }
+.source-link[hidden] { display: none; }
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
 }
 
 /* Accessibilité */
-.chip:focus-visible {
+.select:focus-visible,
+.source-link:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .spinner { animation-duration: 2s; }
-    .chip { transition: none; }
 }
 
 /* Mobile : le lecteur passe en pleine largeur */
@@ -143,8 +155,5 @@ html, body {
     .page { padding: 0 0 calc(24px + env(safe-area-inset-bottom, 0px)); }
     .header { padding: 16px 16px 0; margin-bottom: 12px; }
     .sources { padding: 0 16px; margin-bottom: 12px; }
-    .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-    .chips::-webkit-scrollbar { display: none; }
-    .chip { flex: none; }
     .player { border-radius: 0; }
 }
